@@ -1,0 +1,29 @@
+name: CKPool Worker Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'       # every 5 minutes
+  workflow_dispatch:           # allows manual runs
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: pip install requests
+
+    - name: Run worker-count check
+      run: python check_workers.py
+      env:
+        EMAIL_USER: ${{ secrets.EMAIL_USER }}
+        EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        EMAIL_TO:   ${{ secrets.EMAIL_TO }}
+        THRESHOLD:  ${{ secrets.THRESHOLD }}
