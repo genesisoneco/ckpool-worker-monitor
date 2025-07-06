@@ -2,7 +2,7 @@ name: CKPool Worker Monitor
 
 on:
   schedule:
-    - cron: '*/5 * * * *'       # runs every 5 minutes (UTC)
+    - cron: '*/10 * * * *'       # runs every 10 minutes (UTC)
   workflow_dispatch:           # allows you to kick it off manually
 
 jobs:
