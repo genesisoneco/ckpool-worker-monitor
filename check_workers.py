@@ -6,7 +6,7 @@ import datetime
 from email.mime.text import MIMEText
 
 # Configuration from environment
-URL               = "https://solo.ckpool.org/users/bc1qj77y5emr5xv6jrqn940wn0uk58afya82je7uu5"
+URL               = "https://solo.ckpool.org/users/bc1qjstetm3fsjnc0d9xuwqv3wlucm9slcm9l9gqxa"
 THRESHOLD         = int(os.getenv("THRESHOLD", "6"))
 SMTP_SERVER       = "smtp.gmail.com"
 SMTP_PORT         = 587
