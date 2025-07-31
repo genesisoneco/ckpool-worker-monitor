@@ -2,63 +2,59 @@
 import os, requests, smtplib, datetime
 from email.mime.text import MIMEText
 
-# ── CONFIG ─────────────────────────────────────────────────────────
+# ── CONFIG from GitHub-Actions / env vars ──────────────────────────
 URL   = "https://solo.ckpool.org/users/bc1qjstetm3fsjnc0d9xuwqv3wlucm9slcm9l9gqxa"
-THRESHOLD = int(os.getenv("THRESHOLD", "3"))
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT   = 587
-FROM_EMAIL  = os.getenv("EMAIL_USER")
-APP_PASS    = os.getenv("EMAIL_PASS")
+FROM_EMAIL  = os.getenv("EMAIL_USER")        # gmail addr
+APP_PASS    = os.getenv("EMAIL_PASS")        # 16-char app-password
 TO_EMAILS   = os.getenv("EMAIL_TO")          # comma-separated list
 WEBHOOK     = os.getenv("SHEET_WEBHOOK_URL") # Apps-Script URL
 # ───────────────────────────────────────────────────────────────────
 
-def parse_hashrate(raw):
-    """Return float hashrate in H/s (0 if missing)."""
-    for key in ("hashrate1m", "hashrate_1m", "hashrate"):
-        v = raw.get(key)
+def parse_hashrate(w):
+    """Return float hash-rate in H/s (0 if missing)."""
+    for k in ("hashrate1m", "hashrate_1m", "hashrate"):
+        v = w.get(k)
         if v not in (None, "", 0):
             try:
                 return float(v)
             except ValueError:
-                # string like "1.2T" – ignore
-                pass
+                pass            # string like "1.3T", ignore
     return 0.0
 
-def fetch_workers():
-    r = requests.get(URL, timeout=10)
-    r.raise_for_status()
-    js = r.json()
+def fetch_status():
+    """Return (offline_ids, online_ids) based on hashrate1m == 0."""
+    js = requests.get(URL, timeout=10).json()
 
-    # Support array or object layouts
+    # Flatten possible layouts
     objs = []
-    for k in ("workers_info", "workers"):
-        if isinstance(js.get(k), list):
-            objs = js[k]
+    for key in ("workers_info", "workers"):
+        if isinstance(js.get(key), list):
+            objs = js[key]
             break
-        if isinstance(js.get(k), dict):
-            objs = list(js[k].values())
+        if isinstance(js.get(key), dict):
+            objs = list(js[key].values())
             break
 
-    active, offline = [], []
+    offline, online = [], []
     for w in objs:
-        full = w.get("worker") or w.get("name") or ""
-        wid  = full.split(".")[-1] if "." in full else full
-        hr   = parse_hashrate(w)
-        (active if hr > 0 else offline).append(wid)
+        full  = w.get("worker") or w.get("name") or ""
+        wid   = full.split('.')[-1] if '.' in full else full
+        hr    = parse_hashrate(w)
+        (online if hr > 0 else offline).append(wid)
 
-    return active, offline
+    return offline, online
 
-def send_email(active, offline):
+def send_email(offline, online):
     body = (
-        f"⚠️ ALPHA alert – {len(active)} active / {len(offline)} offline "
-        f"(threshold={THRESHOLD})\n\n"
-        f"Offline IDs: {', '.join(offline) or 'None'}\n\n"
-        f"Active IDs : {', '.join(active)  or 'None'}"
+        "⚠️ Swarm ALPHA alert\n\n"
+        f"Offline workers ({len(offline)}): {', '.join(offline) or 'None'}\n"
+        f"Online  workers ({len(online )}): {', '.join(online ) or 'None'}"
     )
     msg = MIMEText(body)
-    msg["Subject"] = "Swarm ALPHA Worker Alert"
+    msg["Subject"] = "Swarm ALPHA - Offline Worker Alert"
     msg["From"]    = FROM_EMAIL
     msg["To"]      = TO_EMAILS
 
@@ -67,12 +63,12 @@ def send_email(active, offline):
         s.login(FROM_EMAIL, APP_PASS)
         s.send_message(msg)
 
-def log_to_sheet(active, offline):
+def log_to_sheet(offline, online):
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
         "date_time": now,
-        "workers"  : f"{len(active)} active / {len(offline)} offline",
-        "offline"  : ", ".join(offline)
+        "offline"  : ", ".join(offline),
+        "online"   : ", ".join(online)
     }
     try:
         requests.post(WEBHOOK, json=payload, timeout=5)
@@ -80,10 +76,10 @@ def log_to_sheet(active, offline):
         print("Webhook error:", e)
 
 def main():
-    active, offline = fetch_workers()
-    if len(active) < THRESHOLD or offline:       # trigger on count OR any 0-hash worker
-        send_email(active, offline)
-        log_to_sheet(active, offline)
+    offline, online = fetch_status()
+    if offline:                          # alert ONLY if 1+ workers at 0 H/s
+        send_email(offline, online)
+        log_to_sheet(offline, online)
 
 if __name__ == "__main__":
     main()
