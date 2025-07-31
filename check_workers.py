@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 
 # Configuration from environment
 URL               = "https://solo.ckpool.org/users/bc1qjstetm3fsjnc0d9xuwqv3wlucm9slcm9l9gqxa"
-THRESHOLD         = int(os.getenv("THRESHOLD", "6"))
+THRESHOLD         = int(os.getenv("THRESHOLD", "3"))
 SMTP_SERVER       = "smtp.gmail.com"
 SMTP_PORT         = 587
 FROM_EMAIL        = os.getenv("EMAIL_USER")
